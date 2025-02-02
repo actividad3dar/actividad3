@@ -1,7 +1,13 @@
 import { useEffect, useState } from "react";
 import useGeolocation from "./useGeolocation";
 
-interface GasolineraData {
+interface APIResponse {
+  ListaEESSPrecio: GasolineraData[];
+  Fecha: string;
+  ResultadoConsulta: string;
+}
+
+// Resto del código permanece igual...
   Rótulo: string;
   Dirección: string;
   Municipio: string;
@@ -71,7 +77,7 @@ const App = () => {
           throw new Error(`Error en la petición: ${response.status}`);
         }
 
-        const data = await response.json();
+        const data: APIResponse = await response.json();
         console.log('Datos recibidos:', data);
 
         if (!data?.ListaEESSPrecio || !Array.isArray(data.ListaEESSPrecio)) {
@@ -79,7 +85,12 @@ const App = () => {
         }
 
         const gasolinerasData = data.ListaEESSPrecio
-          .map((g: GasolineraData): GasolineraProcessed | null => {
+          .filter((gasolinera: GasolineraData) => {
+            if (!gasolinera.Latitud || !gasolinera.Longitud) return false;
+            const lat = parseFloat(gasolinera.Latitud.replace(',', '.'));
+            const lon = parseFloat(gasolinera.Longitud.replace(',', '.'));
+            return !isNaN(lat) && !isNaN(lon);
+          })
             try {
               const latitud = parseFloat(g.Latitud.replace(',', '.'));
               const longitud = parseFloat(g.Longitud.replace(',', '.'));
@@ -108,8 +119,27 @@ const App = () => {
               return null;
             }
           })
-          .filter((g): g is GasolineraProcessed => g !== null)
-          .sort((a: GasolineraProcessed, b: GasolineraProcessed): number => a.distancia - b.distancia)
+          .map((gasolinera: GasolineraData): GasolineraProcessed => {
+            const latitud = parseFloat(gasolinera.Latitud.replace(',', '.'));
+            const longitud = parseFloat(gasolinera.Longitud.replace(',', '.'));
+            
+            return {
+              Rótulo: gasolinera.Rótulo,
+              Dirección: gasolinera.Dirección,
+              Municipio: gasolinera.Municipio,
+              Horario: gasolinera.Horario,
+              "Precio Gasolina 95 E5": gasolinera["Precio Gasolina 95 E5"],
+              latitud,
+              longitud,
+              distancia: calcularDistancia(
+                location.lat,
+                location.lon,
+                latitud,
+                longitud
+              )
+            };
+          })
+          .sort((a: GasolineraProcessed, b: GasolineraProcessed) => a.distancia - b.distancia)
           .slice(0, 6);
 
         if (gasolinerasData.length === 0) {
