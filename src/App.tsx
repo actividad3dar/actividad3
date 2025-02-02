@@ -2,6 +2,20 @@ import { useEffect, useState } from "react";
 import useGeolocation from "./useGeolocation";
 import { obtenerGasolineras } from "./api/gasolineras";
 
+// Definir la estructura de una gasolinera
+interface Gasolinera {
+  "Rótulo": string;
+  "Dirección": string;
+  "Municipio": string;
+  "Latitud": string;
+  "Longitud": string;
+  "Precio Gasolina 95 E5": string;
+  latitud?: number;
+  longitud?: number;
+  distancia?: number;
+}
+
+// Función para calcular la distancia entre dos coordenadas (Haversine)
 const calcularDistancia = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
   const toRad = (value: number): number => (value * Math.PI) / 180;
   const R = 6371; // Radio de la Tierra en km
@@ -16,15 +30,15 @@ const calcularDistancia = (lat1: number, lon1: number, lat2: number, lon2: numbe
 
 const App = () => {
   const { location, error } = useGeolocation();
-  const [gasolineras, setGasolineras] = useState([]);
+  const [gasolineras, setGasolineras] = useState<Gasolinera[]>([]);
 
   useEffect(() => {
     if (location) {
       obtenerGasolineras().then((data) => {
         console.log("Gasolineras obtenidas:", data);
 
-        // Convertir coordenadas de string a número y corregir formato
-        const gasolinerasConDistancia = data.map((g) => ({
+        // Convertir coordenadas de string a número y calcular distancia
+        const gasolinerasConDistancia: Gasolinera[] = data.map((g: Gasolinera) => ({
           ...g,
           latitud: parseFloat(g["Latitud"].replace(",", ".")), 
           longitud: parseFloat(g["Longitud"].replace(",", ".")),
@@ -36,10 +50,9 @@ const App = () => {
           ),
         }));
 
-        // Ordenar gasolineras por distancia ascendente
-        gasolinerasConDistancia.sort((a, b) => a.distancia - b.distancia);
+        // Ordenar por distancia y tomar solo las 6 más cercanas
+        gasolinerasConDistancia.sort((a, b) => (a.distancia ?? 0) - (b.distancia ?? 0));
 
-        // Guardar solo las 6 más cercanas
         setGasolineras(gasolinerasConDistancia.slice(0, 6));
       });
     }
@@ -76,8 +89,8 @@ const App = () => {
               <h3>⛽ {g["Rótulo"]}</h3>
               <p>📍 <strong>Dirección:</strong> {g["Dirección"]}</p>
               <p>🏙️ <strong>Población:</strong> {g["Municipio"]}</p>
-              <p>📏 <strong>Distancia:</strong> {g.distancia.toFixed(2)} km</p>
-              <p>💰 <strong>Precio Gasolina 95:</strong> {g["Precio Gasolina 95 E5"]} €/L</p>
+              <p>📏 <strong>Distancia:</strong> {g.distancia?.toFixed(2)} km</p>
+              <p>💰 <strong>Precio Gasolina 95:</strong> {g["Precio Gasolina 95 E5"] || "No disponible"} €/L</p>
             </div>
           ))
         ) : (
