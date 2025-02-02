@@ -86,13 +86,17 @@ const App = () => {
         console.log('Datos recibidos:', data);
 
         // Procesar y transformar los datos
-        if (!data?.ListaEESSPrecio) {
+        if (!data?.ListaEESSPrecio || !Array.isArray(data.ListaEESSPrecio)) {
           throw new Error('Formato de datos inválido');
         }
 
-        const gasolinerasConDistancia = data.ListaEESSPrecio
-          .filter((g: GasolineraAPI): g is GasolineraAPI => {
-            return Boolean(g?.Latitud) && Boolean(g?.Longitud);
+        type ResponseGasolinera = {
+          ListaEESSPrecio: GasolineraAPI[];
+        };
+
+        const gasolinerasConDistancia = (data as ResponseGasolinera).ListaEESSPrecio
+          .filter((gasolinera: GasolineraAPI): gasolinera is GasolineraAPI => {
+            return Boolean(gasolinera?.Latitud) && Boolean(gasolinera?.Longitud);
           })
           .map((g: GasolineraAPI): GasolineraProcessed | null => {
             try {
