@@ -1,13 +1,8 @@
 import { useEffect, useState } from "react";
 import useGeolocation from "./useGeolocation";
 
-interface APIResponse {
-  ListaEESSPrecio: GasolineraData[];
-  Fecha: string;
-  ResultadoConsulta: string;
-}
-
-// Resto del código permanece igual...
+// Interfaces
+interface GasolineraData {
   Rótulo: string;
   Dirección: string;
   Municipio: string;
@@ -32,6 +27,13 @@ interface GasolineraProcessed {
   distancia: number;
 }
 
+interface APIResponse {
+  ListaEESSPrecio: GasolineraData[];
+  Fecha: string;
+  ResultadoConsulta: string;
+}
+
+// Función de utilidad
 const calcularDistancia = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
   const R = 6371;
   const toRad = (value: number): number => value * (Math.PI / 180);
@@ -66,12 +68,15 @@ const App = () => {
       setError(null);
       
       try {
-        const response = await fetch('https://sedeaplicaciones.minetur.gob.es/ServiciosRESTCarburantes/PreciosCarburantes/EstacionesTerrestres/', {
-          method: 'GET',
-          headers: {
-            'Accept': 'application/json'
+        const response = await fetch(
+          'https://sedeaplicaciones.minetur.gob.es/ServiciosRESTCarburantes/PreciosCarburantes/EstacionesTerrestres/',
+          {
+            method: 'GET',
+            headers: {
+              'Accept': 'application/json'
+            }
           }
-        });
+        );
 
         if (!response.ok) {
           throw new Error(`Error en la petición: ${response.status}`);
@@ -86,38 +91,12 @@ const App = () => {
 
         const gasolinerasData = data.ListaEESSPrecio
           .filter((gasolinera: GasolineraData) => {
-            if (!gasolinera.Latitud || !gasolinera.Longitud) return false;
+            if (!gasolinera.Latitud || !gasolinera.Longitud) {
+              return false;
+            }
             const lat = parseFloat(gasolinera.Latitud.replace(',', '.'));
             const lon = parseFloat(gasolinera.Longitud.replace(',', '.'));
             return !isNaN(lat) && !isNaN(lon);
-          })
-            try {
-              const latitud = parseFloat(g.Latitud.replace(',', '.'));
-              const longitud = parseFloat(g.Longitud.replace(',', '.'));
-              
-              if (isNaN(latitud) || isNaN(longitud)) {
-                return null;
-              }
-
-              return {
-                Rótulo: g.Rótulo,
-                Dirección: g.Dirección,
-                Municipio: g.Municipio,
-                Horario: g.Horario,
-                "Precio Gasolina 95 E5": g["Precio Gasolina 95 E5"],
-                latitud,
-                longitud,
-                distancia: calcularDistancia(
-                  location.lat,
-                  location.lon,
-                  latitud,
-                  longitud
-                )
-              };
-            } catch (err) {
-              console.error('Error procesando gasolinera:', err);
-              return null;
-            }
           })
           .map((gasolinera: GasolineraData): GasolineraProcessed => {
             const latitud = parseFloat(gasolinera.Latitud.replace(',', '.'));
