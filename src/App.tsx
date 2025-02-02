@@ -14,7 +14,7 @@ interface GasolineraAPI {
   "Precio Gasolina 95 E5": string;
   "Provincia": string;
   "Rótulo": string;
-  [key: string]: string; // Para otros campos que pueda tener la API
+  [key: string]: string | undefined;
 }
 
 // Interfaz para datos procesados con tipado estricto
@@ -31,7 +31,7 @@ interface GasolineraProcessed {
   latitud: number;
   longitud: number;
   distancia: number;
-  [key: string]: string | number; // Permite ambos tipos de valores
+  [key: string]: string | number | undefined;
 }
 
 const calcularDistancia = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
@@ -91,8 +91,10 @@ const App = () => {
         }
 
         const gasolinerasConDistancia = data.ListaEESSPrecio
-          .filter((g: GasolineraAPI) => g?.Latitud && g?.Longitud)
-          .map((g: GasolineraAPI) => {
+          .filter((g: GasolineraAPI): g is GasolineraAPI => {
+            return Boolean(g?.Latitud) && Boolean(g?.Longitud);
+          })
+          .map((g: GasolineraAPI): GasolineraProcessed | null => {
             try {
               const latitud = parseFloat(g.Latitud.replace(',', '.'));
               const longitud = parseFloat(g.Longitud.replace(',', '.'));
