@@ -1,37 +1,26 @@
 import { useEffect, useState } from "react";
 import useGeolocation from "./useGeolocation";
+import Papa from 'papaparse';
 
-// Interfaz para datos crudos de la API
 interface GasolineraAPI {
-  "C.P.": string;
-  "Dirección": string;
-  "Horario": string;
-  "Latitud": string;
-  "Localidad": string;
-  "Longitud": string;
-  "Margen": string;
-  "Municipio": string;
-  "Precio Gasolina 95 E5": string;
-  "Provincia": string;
   "Rótulo": string;
-  [key: string]: string | undefined;
+  "Dirección": string;
+  "Municipio": string;
+  "Latitud": string;
+  "Longitud": string;
+  "Precio Gasolina 95 E5": string;
+  "Margen": string;
+  "Horario": string;
+  "C.P.": string;
+  "Localidad": string;
+  "Provincia": string;
+  [key: string]: string;
 }
 
-// Interfaz para datos procesados con tipado estricto
-interface GasolineraProcessed {
-  "C.P.": string;
-  "Dirección": string;
-  "Horario": string;
-  "Localidad": string;
-  "Margen": string;
-  "Municipio": string;
-  "Precio Gasolina 95 E5": string;
-  "Provincia": string;
-  "Rótulo": string;
+interface GasolineraProcessed extends Omit<GasolineraAPI, 'Latitud' | 'Longitud'> {
   latitud: number;
   longitud: number;
   distancia: number;
-  [key: string]: string | number | undefined;
 }
 
 const calcularDistancia = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
@@ -68,70 +57,70 @@ const App = () => {
       setError(null);
       
       try {
-        // URL directa al dataset de precios de carburantes
-        const API_URL = 'https://sedeaplicaciones.minetur.gob.es/ServiciosRESTCarburantes/PreciosCarburantes/EstacionesTerrestres/';
+        // Leer el archivo CSV
+        const response = await window.fs.readFile('paste.txt', { encoding: 'utf8' });
         
-        console.log('Obteniendo datos de gasolineras...');
-        const response = await fetch(API_URL, {
-          headers: {
-            'Accept': 'application/json'
+        console.log('Datos recibidos:', response);
+        
+        // Parsear el CSV usando Papaparse con configuración robusta
+        Papa.parse(response, {
+          header: true,
+          delimiter: ' ',
+          skipEmptyLines: true,
+          complete: (results) => {
+            if (!results.data || results.data.length === 0) {
+              setError('No se encontraron datos de gasolineras');
+              setLoading(false);
+              return;
+            }
+
+            // Procesar y transformar los datos
+            const gasolinerasConDistancia = results.data
+              .filter((g: any): g is GasolineraAPI => {
+                return g && typeof g.Latitud === 'string' && typeof g.Longitud === 'string';
+              })
+              .map((g: GasolineraAPI): GasolineraProcessed | null => {
+                try {
+                  const latitud = parseFloat(g.Latitud);
+                  const longitud = parseFloat(g.Longitud);
+                  
+                  if (isNaN(latitud) || isNaN(longitud)) {
+                    return null;
+                  }
+
+                  return {
+                    ...g,
+                    latitud,
+                    longitud,
+                    distancia: calcularDistancia(
+                      location.lat,
+                      location.lon,
+                      latitud,
+                      longitud
+                    )
+                  };
+                } catch (err) {
+                  console.error('Error procesando gasolinera:', err);
+                  return null;
+                }
+              })
+              .filter((g): g is GasolineraProcessed => g !== null)
+              .sort((a: GasolineraProcessed, b: GasolineraProcessed): number => a.distancia - b.distancia)
+              .slice(0, 6);
+
+            setGasolineras(gasolinerasConDistancia);
+            setLoading(false);
+          },
+          error: (error) => {
+            console.error('Error al parsear CSV:', error);
+            setError('Error al procesar los datos de gasolineras');
+            setLoading(false);
           }
         });
 
-        if (!response.ok) {
-          throw new Error(`Error en la petición: ${response.status}`);
-        }
-
-        const data = await response.json();
-        console.log('Datos recibidos:', data);
-
-        // Procesar y transformar los datos
-        if (!data?.ListaEESSPrecio || !Array.isArray(data.ListaEESSPrecio)) {
-          throw new Error('Formato de datos inválido');
-        }
-
-        type ResponseGasolinera = {
-          ListaEESSPrecio: GasolineraAPI[];
-        };
-
-        const gasolinerasConDistancia = (data as ResponseGasolinera).ListaEESSPrecio
-          .filter((gasolinera: GasolineraAPI): gasolinera is GasolineraAPI => {
-            return Boolean(gasolinera?.Latitud) && Boolean(gasolinera?.Longitud);
-          })
-          .map((g: GasolineraAPI): GasolineraProcessed | null => {
-            try {
-              const latitud = parseFloat(g.Latitud.replace(',', '.'));
-              const longitud = parseFloat(g.Longitud.replace(',', '.'));
-              
-              if (isNaN(latitud) || isNaN(longitud)) {
-                return null;
-              }
-
-              return {
-                ...g,
-                latitud,
-                longitud,
-                distancia: calcularDistancia(
-                  location.lat,
-                  location.lon,
-                  latitud,
-                  longitud
-                )
-              };
-            } catch (err) {
-              console.error('Error procesando gasolinera:', err);
-              return null;
-            }
-          })
-          .filter((g): g is GasolineraProcessed => g !== null)
-          .sort((a: GasolineraProcessed, b: GasolineraProcessed): number => a.distancia - b.distancia)
-          .slice(0, 6);
-
-        setGasolineras(gasolinerasConDistancia);
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Error desconocido al obtener gasolineras');
         console.error('Error:', err);
-      } finally {
+        setError(err instanceof Error ? err.message : 'Error desconocido al obtener gasolineras');
         setLoading(false);
       }
     };
@@ -179,6 +168,7 @@ const App = () => {
               <h3 className="text-xl font-semibold mb-2">⛽ {g["Rótulo"]}</h3>
               <p className="mb-1">📍 <strong>Dirección:</strong> {g["Dirección"]}</p>
               <p className="mb-1">🏙️ <strong>Población:</strong> {g["Municipio"]}</p>
+              <p className="mb-1">🕒 <strong>Horario:</strong> {g["Horario"]}</p>
               <p className="mb-1">📏 <strong>Distancia:</strong> {g.distancia.toFixed(2)} km</p>
               <p className="mb-1">
                 💰 <strong>Precio Gasolina 95:</strong>{' '}
