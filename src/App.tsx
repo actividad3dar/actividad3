@@ -19,41 +19,40 @@ interface GasolineraAPI {
   "IDEESS": string;
   "IDMunicipio": string;
   "IDProvincia": string;
-  "IDCCAA": string;
+  "IDCCAA": string
 }
 
-// Interfaz para nuestros datos procesados
+// Interfaz para datos procesados
 interface GasolineraProcessed extends GasolineraAPI {
   latitud: number;
   longitud: number;
-  distancia: number;
+  distancia: number
 }
 
 interface APIResponse {
   Fecha: string;
-  ListaEESSPrecio: GasolineraAPI[];
+  ListaEESSPrecio: GasolineraAPI[]
 }
 
 const calcularDistancia = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
-  const R: number = 6371;
+  const R = 6371;
   const toRad = (value: number): number => value * (Math.PI / 180);
   
-  const lat1Rad: number = toRad(lat1);
-  const lon1Rad: number = toRad(lon1);
-  const lat2Rad: number = toRad(lat2);
-  const lon2Rad: number = toRad(lon2);
+  const lat1Rad = toRad(lat1);
+  const lon1Rad = toRad(lon1);
+  const lat2Rad = toRad(lat2);
+  const lon2Rad = toRad(lon2);
   
-  const dLat: number = lat2Rad - lat1Rad;
-  const dLon: number = lon2Rad - lon1Rad;
+  const dLat = lat2Rad - lat1Rad;
+  const dLon = lon2Rad - lon1Rad;
   
-  const sinDLat: number = Math.sin(dLat / 2);
-  const sinDLon: number = Math.sin(dLon / 2);
+  const sinDLat = Math.sin(dLat / 2);
+  const sinDLon = Math.sin(dLon / 2);
   
-  const a: number = 
-    sinDLat * sinDLat +
+  const a = sinDLat * sinDLat +
     Math.cos(lat1Rad) * Math.cos(lat2Rad) * sinDLon * sinDLon;
     
-  const c: number = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   
   return R * c;
 };
@@ -73,12 +72,12 @@ const App = () => {
       
       try {
         const response = await fetch('https://sedeaplicaciones.minetur.gob.es/ServiciosRESTCarburantes/PreciosCarburantes/EstacionesTerrestres/');
+        
         if (!response.ok) {
           throw new Error(`Error en la petición: ${response.status}`);
         }
         
         const data: APIResponse = await response.json();
-        
         console.log('Respuesta de la API:', data);
         
         if (!data?.ListaEESSPrecio || !Array.isArray(data.ListaEESSPrecio)) {
@@ -86,23 +85,20 @@ const App = () => {
         }
         
         console.log('Primera gasolinera:', data.ListaEESSPrecio[0]);
-        }
 
         const gasolinerasConDistancia = data.ListaEESSPrecio
-          .filter((g): g is GasolineraAPI => 
-            g.Latitud != null && 
-            g.Longitud != null && 
-            g.Latitud !== '' && 
-            g.Longitud !== ''
-          )
+          .filter((g): g is GasolineraAPI => {
+            return typeof g?.Latitud === 'string' && 
+                   typeof g?.Longitud === 'string' &&
+                   g.Latitud !== '' && 
+                   g.Longitud !== '';
+          })
           .map((g: GasolineraAPI): GasolineraProcessed | null => {
             try {
-              // Verificar que los valores existen y son strings
               if (typeof g.Latitud !== 'string' || typeof g.Longitud !== 'string') {
                 return null;
               }
               
-              // Convertir las coordenadas, reemplazando coma por punto
               const latitud = parseFloat(g.Latitud.toString().replace(',', '.'));
               const longitud = parseFloat(g.Longitud.toString().replace(',', '.'));
               
