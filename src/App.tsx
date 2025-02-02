@@ -16,14 +16,26 @@ interface Gasolinera {
 
 // Función para calcular la distancia entre dos coordenadas
 const calcularDistancia = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
-  const toRad = (value: number): number => (value * Math.PI) / 180;
-  const R = 6371;
-  const dLat = toRad(lat2 - lat1);
-  const dLon = toRad(lon2 - lon1);
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  const R: number = 6371; // Radio de la Tierra en kilómetros
+  const toRad = (value: number): number => value * (Math.PI / 180);
+  
+  const lat1Rad: number = toRad(lat1);
+  const lon1Rad: number = toRad(lon1);
+  const lat2Rad: number = toRad(lat2);
+  const lon2Rad: number = toRad(lon2);
+  
+  const dLat: number = lat2Rad - lat1Rad;
+  const dLon: number = lon2Rad - lon1Rad;
+  
+  const sinDLat: number = Math.sin(dLat / 2);
+  const sinDLon: number = Math.sin(dLon / 2);
+  
+  const a: number = 
+    sinDLat * sinDLat +
+    Math.cos(lat1Rad) * Math.cos(lat2Rad) * sinDLon * sinDLon;
+    
+  const c: number = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  
   return R * c;
 };
 
