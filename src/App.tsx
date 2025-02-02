@@ -94,9 +94,26 @@ const App = () => {
             if (!gasolinera.Latitud || !gasolinera.Longitud) {
               return false;
             }
-            const lat = parseFloat(gasolinera.Latitud.replace(',', '.'));
-            const lon = parseFloat(gasolinera.Longitud.replace(',', '.'));
-            return !isNaN(lat) && !isNaN(lon);
+            try {
+              const lat = parseFloat(gasolinera.Latitud.replace(',', '.'));
+              const lon = parseFloat(gasolinera.Longitud.replace(',', '.'));
+              if (isNaN(lat) || isNaN(lon)) {
+                return false;
+              }
+              
+              // Calcular distancia aproximada para filtrar
+              const distancia = calcularDistancia(
+                location.lat,
+                location.lon,
+                lat,
+                lon
+              );
+              
+              // Mostrar gasolineras en un radio de 50 km
+              return distancia <= 50;
+            } catch {
+              return false;
+            }
           })
           .map((gasolinera: GasolineraData): GasolineraProcessed => {
             const latitud = parseFloat(gasolinera.Latitud.replace(',', '.'));
@@ -122,7 +139,7 @@ const App = () => {
           .slice(0, 6);
 
         if (gasolinerasData.length === 0) {
-          throw new Error('No se encontraron gasolineras cercanas');
+          throw new Error('No se encontraron gasolineras en un radio de 50 kilómetros');
         }
 
         setGasolineras(gasolinerasData);
