@@ -3,12 +3,23 @@ import useGeolocation from "./useGeolocation";
 
 // Interfaz para los datos de la API
 interface GasolineraAPI {
-  "Rótulo": string;
+  "C.P.": string;
   "Dirección": string;
-  "Municipio": string;
+  "Horario": string;
   "Latitud": string;
+  "Localidad": string;
   "Longitud": string;
+  "Margen": string;
+  "Municipio": string;
   "Precio Gasolina 95 E5": string;
+  "Provincia": string;
+  "Remisión": string;
+  "Rótulo": string;
+  "Tipo Venta": string;
+  "IDEESS": string;
+  "IDMunicipio": string;
+  "IDProvincia": string;
+  "IDCCAA": string;
 }
 
 // Interfaz para nuestros datos procesados
@@ -68,8 +79,13 @@ const App = () => {
         
         const data: APIResponse = await response.json();
         
+        console.log('Respuesta de la API:', data);
+        
         if (!data?.ListaEESSPrecio || !Array.isArray(data.ListaEESSPrecio)) {
           throw new Error('Formato de datos inválido');
+        }
+        
+        console.log('Primera gasolinera:', data.ListaEESSPrecio[0]);
         }
 
         const gasolinerasConDistancia = data.ListaEESSPrecio
@@ -81,10 +97,17 @@ const App = () => {
           )
           .map((g: GasolineraAPI): GasolineraProcessed | null => {
             try {
-              const latitud = parseFloat(g.Latitud.replace(',', '.'));
-              const longitud = parseFloat(g.Longitud.replace(',', '.'));
+              // Verificar que los valores existen y son strings
+              if (typeof g.Latitud !== 'string' || typeof g.Longitud !== 'string') {
+                return null;
+              }
+              
+              // Convertir las coordenadas, reemplazando coma por punto
+              const latitud = parseFloat(g.Latitud.toString().replace(',', '.'));
+              const longitud = parseFloat(g.Longitud.toString().replace(',', '.'));
               
               if (isNaN(latitud) || isNaN(longitud)) {
+                console.log('Coordenadas inválidas:', g.Latitud, g.Longitud);
                 return null;
               }
 
