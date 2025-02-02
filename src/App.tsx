@@ -1,59 +1,112 @@
-import React, { useEffect, useState } from 'react';
-import useGeolocation from './useGeolocation';
-import { obtenerGasolineras } from './api/gasolineras';
+import { useEffect, useState } from "react";
+import useGeolocation from "./useGeolocation";
+import { obtenerGasolineras } from "./api/gasolineras";
+
+// Definir la estructura de una gasolinera
+interface Gasolinera {
+  "Rótulo": string;
+  "Dirección": string;
+  "Municipio": string;
+  "Latitud": string;
+  "Longitud (WGS84)": string;
+  "Precio Gasolina 95 E5"?: string;
+  latitud?: number;
+  longitud?: number;
+  distancia?: number;
+}
+
+// Función para calcular la distancia entre dos coordenadas (Haversine)
+const calcularDistancia = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+  const toRad = (value: number): number => (value * Math.PI) / 180;
+  const R = 6371; // Radio de la Tierra en km
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c; // Distancia en km
+};
 
 const App = () => {
   const { location, error } = useGeolocation();
-  const [gasolineras, setGasolineras] = useState([]);
+  const [gasolineras, setGasolineras] = useState<Gasolinera[]>([]);
 
   useEffect(() => {
-    const fetchGasolineras = async () => {
-      const data = await obtenerGasolineras();
-      if (location) {
-        const gasolinerasConDistancia = data.map((g) => {
-          const latitud = parseFloat(g['Latitud'].replace(',', '.'));
-          const longitud = parseFloat(g['Longitud (WGS84)'].replace(',', '.'));
-          const distancia = calcularDistancia(location.lat, location.lon, latitud, longitud);
-          return { ...g, latitud, longitud, distancia };
-        });
-        gasolinerasConDistancia.sort((a, b) => a.distancia - b.distancia);
-        setGasolineras(gasolinerasConDistancia.slice(0, 6));
-      } else {
-        setGasolineras(data.slice(0, 6));
-      }
-    };
+    if (location) {
+      console.log("Ubicación obtenida:", location);
+      obtenerGasolineras().then((data) => {
+        console.log("Gasolineras obtenidas de la API:", data);
 
-    fetchGasolineras();
+        if (!data || data.length === 0) {
+          console.error("No se recibieron datos de la API");
+          return;
+        }
+
+        // Convertir coordenadas y calcular distancia
+        const gasolinerasConDistancia: Gasolinera[] = data.map((g: Gasolinera) => {
+          const latitud = parseFloat(g["Latitud"].replace(",", "."));
+          const longitud = parseFloat(g["Longitud (WGS84)"].replace(",", "."));
+
+          return {
+            ...g,
+            latitud,
+            longitud,
+            distancia: calcularDistancia(location.lat, location.lon, latitud, longitud),
+          };
+        });
+
+        // Ordenar por distancia y tomar solo las 6 más cercanas
+        gasolinerasConDistancia.sort((a, b) => (a.distancia ?? 0) - (b.distancia ?? 0));
+
+        console.log("Gasolineras ordenadas por distancia:", gasolinerasConDistancia.slice(0, 6));
+
+        setGasolineras(gasolinerasConDistancia.slice(0, 6));
+      }).catch((error) => {
+        console.error("Error obteniendo gasolineras:", error);
+      });
+    }
   }, [location]);
 
-  const calcularDistancia = (lat1, lon1, lat2, lon2) => {
-    const toRad = (value) => (value * Math.PI) / 180;
-    const R = 6371; // Radio de la Tierra en km
-    const dLat = toRad(lat2 - lat1);
-    const dLon = toRad(lon2 - lon1);
-    const a =
-      Math.sin(dLat / 2) ** 2 +
-      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c; // Distancia en km
-  };
-
   return (
-    <div>
-      <h1>Gasolineras Cercanas</h1>
-      {error && <p>Error: {error}</p>}
+    <div style={{ textAlign: "center", marginTop: "50px" }}>
+      <h1 style={{ fontSize: "2rem", fontWeight: "bold" }}>⛽ Encuentra Gasolineras Cercanas</h1>
+      
+      {error && <p style={{ color: "red" }}>{error}</p>}
+
       {location && (
         <p>
-          Tu ubicación: Latitud {location.lat}, Longitud {location.lon}
+          🌍 <strong>Tu ubicación:</strong> <br />
+          📍 <strong>Latitud:</strong> {location.lat} <br />
+          📍 <strong>Longitud:</strong> {location.lon}
         </p>
       )}
-      <ul>
-        {gasolineras.map((g, index) => (
-          <li key={index}>
-            {g['Rótulo']} - {g['Precio Gasolina 95 E5']} €/L - {g['Municipio']}
-          </li>
-        ))}
-      </ul>
+
+      <h2 style={{ marginTop: "20px", fontSize: "1.5rem" }}>Gasolineras Cercanas:</h2>
+      
+      <div style={{ display: "flex", justifyContent: "center", flexWrap: "wrap", gap: "20px", marginTop: "20px" }}>
+        {gasolineras.length > 0 ? (
+          gasolineras.map((g, index) => (
+            <div key={index} style={{
+              border: "1px solid #ddd",
+              borderRadius: "10px",
+              padding: "15px",
+              width: "300px",
+              textAlign: "left",
+              backgroundColor: "#f9f9f9",
+              boxShadow: "2px 2px 10px rgba(0,0,0,0.1)"
+            }}>
+              <h3>⛽ {g["Rótulo"]}</h3>
+              <p>📍 <strong>Dirección:</strong> {g["Dirección"]}</p>
+              <p>🏙️ <strong>Población:</strong> {g["Municipio"]}</p>
+              <p>📏 <strong>Distancia:</strong> {g.distancia?.toFixed(2)} km</p>
+              <p>💰 <strong>Precio Gasolina 95:</strong> {g["Precio Gasolina 95 E5"] || "No disponible"} €/L</p>
+            </div>
+          ))
+        ) : (
+          <p>Cargando gasolineras...</p>
+        )}
+      </div>
     </div>
   );
 };
