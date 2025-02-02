@@ -103,7 +103,7 @@ const App = () => {
                 return null;
               }
 
-              const gasProcessed: GasolineraProcessed = {
+              return {
                 ...g,
                 latitud,
                 longitud,
@@ -114,15 +114,13 @@ const App = () => {
                   longitud
                 )
               };
-
-              return gasProcessed;
             } catch (err) {
               console.error('Error procesando gasolinera:', err);
               return null;
             }
           })
           .filter((g): g is GasolineraProcessed => g !== null)
-          .sort((a, b) => a.distancia - b.distancia)
+          .sort((a: GasolineraProcessed, b: GasolineraProcessed): number => a.distancia - b.distancia)
           .slice(0, 6);
 
         setGasolineras(gasolinerasConDistancia);
