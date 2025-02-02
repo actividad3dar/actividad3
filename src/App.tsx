@@ -2,17 +2,17 @@ import { useEffect, useState } from "react";
 import useGeolocation from "./useGeolocation";
 
 interface GasolineraData {
-  "Rótulo": string;
-  "Dirección": string;
-  "Municipio": string;
-  "Latitud": string;
-  "Longitud": string;
+  Rótulo: string;
+  Dirección: string;
+  Municipio: string;
+  Latitud: string;
+  Longitud: string;
   "Precio Gasolina 95 E5": string;
-  "Margen": string;
-  "Horario": string;
+  Margen: string;
+  Horario: string;
   "C.P."?: string;
-  "Localidad"?: string;
-  "Provincia"?: string;
+  Localidad?: string;
+  Provincia?: string;
 }
 
 interface GasolineraProcessed {
@@ -25,27 +25,6 @@ interface GasolineraProcessed {
   longitud: number;
   distancia: number;
 }
-
-const parseCSVLine = (line: string): GasolineraData | null => {
-  try {
-    const parts = line.split(" ");
-    return {
-      "Rótulo": parts[11] || "",
-      "Dirección": parts[2] || "",
-      "Municipio": parts[8] || "",
-      "Latitud": parts[4] || "",
-      "Longitud": parts[6] || "",
-      "Precio Gasolina 95 E5": parts[9] || "",
-      "Margen": parts[7] || "",
-      "Horario": parts[3] || "",
-      "C.P.": parts[1],
-      "Localidad": parts[5],
-      "Provincia": parts[10]
-    };
-  } catch {
-    return null;
-  }
-};
 
 const calcularDistancia = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
   const R = 6371;
@@ -91,6 +70,7 @@ const App = () => {
         if (!response.ok) {
           throw new Error(`Error en la petición: ${response.status}`);
         }
+
         const data = await response.json();
         console.log('Datos recibidos:', data);
 
@@ -99,23 +79,10 @@ const App = () => {
         }
 
         const gasolinerasData = data.ListaEESSPrecio
-          .map((g: any): GasolineraData | null => ({
-            "Rótulo": g?.Rótulo || "",
-            "Dirección": g?.Dirección || "",
-            "Municipio": g?.Municipio || "",
-            "Latitud": g?.Latitud?.toString() || "",
-            "Longitud": g?.Longitud?.toString() || "",
-            "Precio Gasolina 95 E5": g?.["Precio Gasolina 95 E5"]?.toString() || "",
-            "Margen": g?.Margen || "",
-            "Horario": g?.Horario || "",
-            "C.P.": g?.["C.P."] || "",
-            "Localidad": g?.Localidad || "",
-            "Provincia": g?.Provincia || ""
-          }))
-          .map((g: GasolineraData) => {
+          .map((g: GasolineraData): GasolineraProcessed | null => {
             try {
-              const latitud = parseFloat(g.Latitud);
-              const longitud = parseFloat(g.Longitud);
+              const latitud = parseFloat(g.Latitud.replace(',', '.'));
+              const longitud = parseFloat(g.Longitud.replace(',', '.'));
               
               if (isNaN(latitud) || isNaN(longitud)) {
                 return null;
@@ -135,14 +102,14 @@ const App = () => {
                   latitud,
                   longitud
                 )
-              } as GasolineraProcessed;
+              };
             } catch (err) {
               console.error('Error procesando gasolinera:', err);
               return null;
             }
           })
           .filter((g): g is GasolineraProcessed => g !== null)
-          .sort((a, b) => a.distancia - b.distancia)
+          .sort((a: GasolineraProcessed, b: GasolineraProcessed): number => a.distancia - b.distancia)
           .slice(0, 6);
 
         if (gasolinerasData.length === 0) {
