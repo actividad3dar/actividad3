@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import useGeolocation from "./useGeolocation";
 
-// Interfaz para los datos de la API
 interface GasolineraAPI {
   "C.P.": string;
   "Dirección": string;
@@ -13,25 +12,14 @@ interface GasolineraAPI {
   "Municipio": string;
   "Precio Gasolina 95 E5": string;
   "Provincia": string;
-  "Remisión": string;
   "Rótulo": string;
-  "Tipo Venta": string;
-  "IDEESS": string;
-  "IDMunicipio": string;
-  "IDProvincia": string;
-  "IDCCAA": string
+  [key: string]: string; // Para otros campos que pueda tener la API
 }
 
-// Interfaz para datos procesados
-interface GasolineraProcessed extends GasolineraAPI {
+interface GasolineraProcessed extends Omit<GasolineraAPI, 'Latitud' | 'Longitud'> {
   latitud: number;
   longitud: number;
-  distancia: number
-}
-
-interface APIResponse {
-  Fecha: string;
-  ListaEESSPrecio: GasolineraAPI[]
+  distancia: number;
 }
 
 const calcularDistancia = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
@@ -46,14 +34,11 @@ const calcularDistancia = (lat1: number, lon1: number, lat2: number, lon2: numbe
   const dLat = lat2Rad - lat1Rad;
   const dLon = lon2Rad - lon1Rad;
   
-  const sinDLat = Math.sin(dLat / 2);
-  const sinDLon = Math.sin(dLon / 2);
+  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+           Math.cos(lat1Rad) * Math.cos(lat2Rad) * 
+           Math.sin(dLon/2) * Math.sin(dLon/2);
   
-  const a = sinDLat * sinDLat +
-    Math.cos(lat1Rad) * Math.cos(lat2Rad) * sinDLon * sinDLon;
-    
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
   return R * c;
 };
 
@@ -71,22 +56,54 @@ const App = () => {
       setError(null);
       
       try {
-        const response = await fetch('https://sedeaplicaciones.minetur.gob.es/ServiciosRESTCarburantes/PreciosCarburantes/EstacionesTerrestres/');
+        // Primero obtenemos el dataset
+        const datasetResponse = await fetch('http://datos.gob.es/apidata/catalog/dataset/title/precio-carburantes', {
+          headers: {
+            'Accept': 'application/json'
+          }
+        });
+
+        if (!datasetResponse.ok) {
+          throw new Error('Error obteniendo información del dataset');
+        }
+
+        const datasetData = await datasetResponse.json();
+        console.log('Dataset encontrado:', datasetData);
+
+        // Una vez tengamos el ID del dataset, obtendremos sus distribuciones
+        const distributionResponse = await fetch(`http://datos.gob.es/apidata/catalog/distribution/dataset/${datasetData.result.items[0].identifier}`, {
+          headers: {
+            'Accept': 'application/json'
+          }
+        });
+
+        if (!distributionResponse.ok) {
+          throw new Error('Error obteniendo distribuciones');
+        }
+
+        const distributionData = await distributionResponse.json();
+        console.log('Distribuciones encontradas:', distributionData);
         
+        console.log('Iniciando petición a la API...');
+        const response = await fetch(API_URL, {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json'
+          }
+        });
+
         if (!response.ok) {
           throw new Error(`Error en la petición: ${response.status}`);
         }
-        
-        const data: APIResponse = await response.json();
+
+        const data = await response.json();
         console.log('Respuesta de la API:', data);
-        
-        if (!data?.ListaEESSPrecio || !Array.isArray(data.ListaEESSPrecio)) {
+
+        if (!Array.isArray(data)) {
           throw new Error('Formato de datos inválido');
         }
-        
-        console.log('Primera gasolinera:', data.ListaEESSPrecio[0]);
 
-        const gasolinerasConDistancia = data.ListaEESSPrecio
+        const gasolinerasConDistancia = data
           .filter((g): g is GasolineraAPI => {
             return typeof g?.Latitud === 'string' && 
                    typeof g?.Longitud === 'string' &&
@@ -95,28 +112,26 @@ const App = () => {
           })
           .map((g: GasolineraAPI): GasolineraProcessed | null => {
             try {
-              if (typeof g.Latitud !== 'string' || typeof g.Longitud !== 'string') {
-                return null;
-              }
-              
-              const latitud = parseFloat(g.Latitud.toString().replace(',', '.'));
-              const longitud = parseFloat(g.Longitud.toString().replace(',', '.'));
+              const latitud = parseFloat(g.Latitud.replace(',', '.'));
+              const longitud = parseFloat(g.Longitud.replace(',', '.'));
               
               if (isNaN(latitud) || isNaN(longitud)) {
                 console.log('Coordenadas inválidas:', g.Latitud, g.Longitud);
                 return null;
               }
 
+              const distancia = calcularDistancia(
+                location.lat,
+                location.lon,
+                latitud,
+                longitud
+              );
+
               return {
                 ...g,
                 latitud,
                 longitud,
-                distancia: calcularDistancia(
-                  location.lat,
-                  location.lon,
-                  latitud,
-                  longitud
-                )
+                distancia
               };
             } catch (err) {
               console.error('Error procesando gasolinera:', err);
