@@ -6,11 +6,14 @@ const App = () => {
   const { location, error } = useGeolocation();
   const [gasolineras, setGasolineras] = useState([]);
 
-  useEffect(() => {
-    if (location) {
-      obtenerGasolineras().then(setGasolineras);
-    }
-  }, [location]);
+useEffect(() => {
+  if (location) {
+    obtenerGasolineras().then((data) => {
+      console.log("Gasolineras obtenidas:", data);
+      setGasolineras(data);
+    });
+  }
+}, [location]);
 
   return (
     <div style={{ textAlign: "center", marginTop: "50px" }}>
