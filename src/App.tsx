@@ -1,8 +1,7 @@
 import { useEffect, useState } from "react";
 import useGeolocation from "./useGeolocation";
-import Papa from 'papaparse';
 
-interface GasolineraAPI {
+interface GasolineraData {
   "Rótulo": string;
   "Dirección": string;
   "Municipio": string;
@@ -11,17 +10,43 @@ interface GasolineraAPI {
   "Precio Gasolina 95 E5": string;
   "Margen": string;
   "Horario": string;
-  "C.P.": string;
-  "Localidad": string;
-  "Provincia": string;
-  [key: string]: string;
+  "C.P."?: string;
+  "Localidad"?: string;
+  "Provincia"?: string;
 }
 
-interface GasolineraProcessed extends Omit<GasolineraAPI, 'Latitud' | 'Longitud'> {
+interface GasolineraProcessed {
+  Rótulo: string;
+  Dirección: string;
+  Municipio: string;
+  Horario: string;
+  "Precio Gasolina 95 E5": string;
   latitud: number;
   longitud: number;
   distancia: number;
 }
+
+const parseCSVLine = (line: string): GasolineraData | null => {
+  try {
+    const [fecha, cp, direccion, horario, latitud, localidad, longitud, margen, municipio, precio95, provincia, rotulo, ...resto] = line.split(" ");
+    
+    return {
+      "Rótulo": rotulo || "",
+      "Dirección": direccion || "",
+      "Municipio": municipio || "",
+      "Latitud": latitud || "",
+      "Longitud": longitud || "",
+      "Precio Gasolina 95 E5": precio95 || "",
+      "Margen": margen || "",
+      "Horario": horario || "",
+      "C.P.": cp,
+      "Localidad": localidad,
+      "Provincia": provincia
+    };
+  } catch {
+    return null;
+  }
+};
 
 const calcularDistancia = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
   const R = 6371;
@@ -57,70 +82,56 @@ const App = () => {
       setError(null);
       
       try {
-        // Leer el archivo CSV
         const response = await window.fs.readFile('paste.txt', { encoding: 'utf8' });
+        const lines = response.split('\n').filter(line => line.trim().length > 0);
         
-        console.log('Datos recibidos:', response);
+        console.log('Datos recibidos:', lines[0]); // Log primera línea para debug
         
-        // Parsear el CSV usando Papaparse con configuración robusta
-        Papa.parse(response, {
-          header: true,
-          delimiter: ' ',
-          skipEmptyLines: true,
-          complete: (results) => {
-            if (!results.data || results.data.length === 0) {
-              setError('No se encontraron datos de gasolineras');
-              setLoading(false);
-              return;
+        const gasolinerasData = lines
+          .map(parseCSVLine)
+          .filter((g): g is GasolineraData => g !== null)
+          .map(g => {
+            try {
+              const latitud = parseFloat(g.Latitud);
+              const longitud = parseFloat(g.Longitud);
+              
+              if (isNaN(latitud) || isNaN(longitud)) {
+                return null;
+              }
+
+              return {
+                Rótulo: g.Rótulo,
+                Dirección: g.Dirección,
+                Municipio: g.Municipio,
+                Horario: g.Horario,
+                "Precio Gasolina 95 E5": g["Precio Gasolina 95 E5"],
+                latitud,
+                longitud,
+                distancia: calcularDistancia(
+                  location.lat,
+                  location.lon,
+                  latitud,
+                  longitud
+                )
+              } as GasolineraProcessed;
+            } catch (err) {
+              console.error('Error procesando gasolinera:', err);
+              return null;
             }
+          })
+          .filter((g): g is GasolineraProcessed => g !== null)
+          .sort((a, b) => a.distancia - b.distancia)
+          .slice(0, 6);
 
-            // Procesar y transformar los datos
-            const gasolinerasConDistancia = results.data
-              .filter((g: any): g is GasolineraAPI => {
-                return g && typeof g.Latitud === 'string' && typeof g.Longitud === 'string';
-              })
-              .map((g: GasolineraAPI): GasolineraProcessed | null => {
-                try {
-                  const latitud = parseFloat(g.Latitud);
-                  const longitud = parseFloat(g.Longitud);
-                  
-                  if (isNaN(latitud) || isNaN(longitud)) {
-                    return null;
-                  }
+        if (gasolinerasData.length === 0) {
+          throw new Error('No se encontraron gasolineras cercanas');
+        }
 
-                  return {
-                    ...g,
-                    latitud,
-                    longitud,
-                    distancia: calcularDistancia(
-                      location.lat,
-                      location.lon,
-                      latitud,
-                      longitud
-                    )
-                  };
-                } catch (err) {
-                  console.error('Error procesando gasolinera:', err);
-                  return null;
-                }
-              })
-              .filter((g): g is GasolineraProcessed => g !== null)
-              .sort((a: GasolineraProcessed, b: GasolineraProcessed): number => a.distancia - b.distancia)
-              .slice(0, 6);
-
-            setGasolineras(gasolinerasConDistancia);
-            setLoading(false);
-          },
-          error: (error) => {
-            console.error('Error al parsear CSV:', error);
-            setError('Error al procesar los datos de gasolineras');
-            setLoading(false);
-          }
-        });
-
+        setGasolineras(gasolinerasData);
       } catch (err) {
         console.error('Error:', err);
         setError(err instanceof Error ? err.message : 'Error desconocido al obtener gasolineras');
+      } finally {
         setLoading(false);
       }
     };
@@ -165,10 +176,10 @@ const App = () => {
               key={index}
               className="border rounded-lg p-4 bg-white shadow hover:shadow-lg transition-shadow"
             >
-              <h3 className="text-xl font-semibold mb-2">⛽ {g["Rótulo"]}</h3>
-              <p className="mb-1">📍 <strong>Dirección:</strong> {g["Dirección"]}</p>
-              <p className="mb-1">🏙️ <strong>Población:</strong> {g["Municipio"]}</p>
-              <p className="mb-1">🕒 <strong>Horario:</strong> {g["Horario"]}</p>
+              <h3 className="text-xl font-semibold mb-2">⛽ {g.Rótulo}</h3>
+              <p className="mb-1">📍 <strong>Dirección:</strong> {g.Dirección}</p>
+              <p className="mb-1">🏙️ <strong>Población:</strong> {g.Municipio}</p>
+              <p className="mb-1">🕒 <strong>Horario:</strong> {g.Horario}</p>
               <p className="mb-1">📏 <strong>Distancia:</strong> {g.distancia.toFixed(2)} km</p>
               <p className="mb-1">
                 💰 <strong>Precio Gasolina 95:</strong>{' '}
