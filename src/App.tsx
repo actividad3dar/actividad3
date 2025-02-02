@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import useGeolocation from "./useGeolocation";
 
-// Interfaz para una gasolinera
 interface Gasolinera {
   "Rótulo": string;
   "Dirección": string;
@@ -14,7 +13,11 @@ interface Gasolinera {
   distancia?: number;
 }
 
-// Función para calcular la distancia entre dos coordenadas
+interface APIResponse {
+  Fecha: string;
+  ListaEESSPrecio: Gasolinera[];
+}
+
 const calcularDistancia = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
   const R: number = 6371; // Radio de la Tierra en kilómetros
   const toRad = (value: number): number => value * (Math.PI / 180);
@@ -58,26 +61,46 @@ const App = () => {
           throw new Error(`Error en la petición: ${response.status}`);
         }
         
-        const data = await response.json();
+        const data: APIResponse = await response.json();
         
         if (!data?.ListaEESSPrecio || !Array.isArray(data.ListaEESSPrecio)) {
           throw new Error('Formato de datos inválido');
         }
 
-        const gasolinerasConDistancia: Gasolinera[] = data.ListaEESSPrecio
-          .map((g: Gasolinera) => ({
-            ...g,
-            latitud: parseFloat(g["Latitud"].replace(",", ".")),
-            longitud: parseFloat(g["Longitud"].replace(",", ".")),
-            distancia: calcularDistancia(
-              location.lat,
-              location.lon,
-              parseFloat(g["Latitud"].replace(",", ".")),
-              parseFloat(g["Longitud"].replace(",", "."))
-            ),
-          }))
+        const gasolinerasConDistancia = data.ListaEESSPrecio
+          .filter(g => g.Latitud && g.Longitud) // Filtrar gasolineras sin coordenadas
+          .map((g: Gasolinera) => {
+            try {
+              const latitud = parseFloat(g.Latitud.replace(',', '.'));
+              const longitud = parseFloat(g.Longitud.replace(',', '.'));
+              
+              if (isNaN(latitud) || isNaN(longitud)) {
+                return null;
+              }
+
+              return {
+                ...g,
+                latitud,
+                longitud,
+                distancia: calcularDistancia(
+                  location.lat,
+                  location.lon,
+                  latitud,
+                  longitud
+                ),
+              };
+            } catch (err) {
+              console.error('Error procesando gasolinera:', err);
+              return null;
+            }
+          })
+          .filter((g): g is Gasolinera => g !== null)
           .sort((a: Gasolinera, b: Gasolinera) => (a.distancia ?? 0) - (b.distancia ?? 0))
           .slice(0, 6);
+
+        if (gasolinerasConDistancia.length === 0) {
+          throw new Error('No se encontraron gasolineras cercanas');
+        }
 
         setGasolineras(gasolinerasConDistancia);
       } catch (err) {
@@ -105,8 +128,8 @@ const App = () => {
         <div className="text-center mb-6">
           <p className="text-lg">
             🌍 <strong>Tu ubicación:</strong><br />
-            📍 Latitud: {location.lat}<br />
-            📍 Longitud: {location.lon}
+            📍 <strong>Latitud:</strong> {location.lat}<br />
+            📍 <strong>Longitud:</strong> {location.lon}
           </p>
         </div>
       )}
