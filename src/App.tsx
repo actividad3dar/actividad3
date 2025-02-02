@@ -2,8 +2,8 @@ import { useEffect, useState } from "react";
 import useGeolocation from "./useGeolocation";
 import { obtenerGasolineras } from "./api/gasolineras";
 
-const calcularDistancia = (lat1, lon1, lat2, lon2) => {
-  const toRad = (value) => (value * Math.PI) / 180;
+const calcularDistancia = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+  const toRad = (value: number): number => (value * Math.PI) / 180;
   const R = 6371; // Radio de la Tierra en km
   const dLat = toRad(lat2 - lat1);
   const dLon = toRad(lon2 - lon1);
