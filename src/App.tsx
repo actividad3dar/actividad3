@@ -28,20 +28,19 @@ interface GasolineraProcessed {
 
 const parseCSVLine = (line: string): GasolineraData | null => {
   try {
-    const [fecha, cp, direccion, horario, latitud, localidad, longitud, margen, municipio, precio95, provincia, rotulo, ...resto] = line.split(" ");
-    
+    const parts = line.split(" ");
     return {
-      "Rótulo": rotulo || "",
-      "Dirección": direccion || "",
-      "Municipio": municipio || "",
-      "Latitud": latitud || "",
-      "Longitud": longitud || "",
-      "Precio Gasolina 95 E5": precio95 || "",
-      "Margen": margen || "",
-      "Horario": horario || "",
-      "C.P.": cp,
-      "Localidad": localidad,
-      "Provincia": provincia
+      "Rótulo": parts[11] || "",
+      "Dirección": parts[2] || "",
+      "Municipio": parts[8] || "",
+      "Latitud": parts[4] || "",
+      "Longitud": parts[6] || "",
+      "Precio Gasolina 95 E5": parts[9] || "",
+      "Margen": parts[7] || "",
+      "Horario": parts[3] || "",
+      "C.P.": parts[1],
+      "Localidad": parts[5],
+      "Provincia": parts[10]
     };
   } catch {
     return null;
@@ -82,15 +81,38 @@ const App = () => {
       setError(null);
       
       try {
-        const response = await window.fs.readFile('paste.txt', { encoding: 'utf8' });
-        const lines = response.split('\n').filter(line => line.trim().length > 0);
-        
-        console.log('Datos recibidos:', lines[0]); // Log primera línea para debug
-        
-        const gasolinerasData = lines
-          .map(parseCSVLine)
-          .filter((g): g is GasolineraData => g !== null)
-          .map(g => {
+        const response = await fetch('https://sedeaplicaciones.minetur.gob.es/ServiciosRESTCarburantes/PreciosCarburantes/EstacionesTerrestres/', {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json'
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error(`Error en la petición: ${response.status}`);
+        }
+        const data = await response.json();
+        console.log('Datos recibidos:', data);
+
+        if (!data?.ListaEESSPrecio || !Array.isArray(data.ListaEESSPrecio)) {
+          throw new Error('Formato de datos inválido');
+        }
+
+        const gasolinerasData = data.ListaEESSPrecio
+          .map((g: any): GasolineraData | null => ({
+            "Rótulo": g?.Rótulo || "",
+            "Dirección": g?.Dirección || "",
+            "Municipio": g?.Municipio || "",
+            "Latitud": g?.Latitud?.toString() || "",
+            "Longitud": g?.Longitud?.toString() || "",
+            "Precio Gasolina 95 E5": g?.["Precio Gasolina 95 E5"]?.toString() || "",
+            "Margen": g?.Margen || "",
+            "Horario": g?.Horario || "",
+            "C.P.": g?.["C.P."] || "",
+            "Localidad": g?.Localidad || "",
+            "Provincia": g?.Provincia || ""
+          }))
+          .map((g: GasolineraData) => {
             try {
               const latitud = parseFloat(g.Latitud);
               const longitud = parseFloat(g.Longitud);
