@@ -76,7 +76,7 @@ const App = () => {
               parseFloat(g["Longitud"].replace(",", "."))
             ),
           }))
-          .sort((a, b) => (a.distancia ?? 0) - (b.distancia ?? 0))
+          .sort((a: Gasolinera, b: Gasolinera) => (a.distancia ?? 0) - (b.distancia ?? 0))
           .slice(0, 6);
 
         setGasolineras(gasolinerasConDistancia);
