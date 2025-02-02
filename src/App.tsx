@@ -1,25 +1,30 @@
 import { useEffect, useState } from "react";
 import useGeolocation from "./useGeolocation";
 
-interface Gasolinera {
+// Interfaz para los datos de la API
+interface GasolineraAPI {
   "Rótulo": string;
   "Dirección": string;
   "Municipio": string;
   "Latitud": string;
   "Longitud": string;
   "Precio Gasolina 95 E5": string;
-  latitud?: number;
-  longitud?: number;
-  distancia?: number;
+}
+
+// Interfaz para nuestros datos procesados
+interface GasolineraProcessed extends GasolineraAPI {
+  latitud: number;
+  longitud: number;
+  distancia: number;
 }
 
 interface APIResponse {
   Fecha: string;
-  ListaEESSPrecio: Gasolinera[];
+  ListaEESSPrecio: GasolineraAPI[];
 }
 
 const calcularDistancia = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
-  const R: number = 6371; // Radio de la Tierra en kilómetros
+  const R: number = 6371;
   const toRad = (value: number): number => value * (Math.PI / 180);
   
   const lat1Rad: number = toRad(lat1);
@@ -44,7 +49,7 @@ const calcularDistancia = (lat1: number, lon1: number, lat2: number, lon2: numbe
 
 const App = () => {
   const { location, error: locationError } = useGeolocation();
-  const [gasolineras, setGasolineras] = useState<Gasolinera[]>([]);
+  const [gasolineras, setGasolineras] = useState<GasolineraProcessed[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -68,8 +73,13 @@ const App = () => {
         }
 
         const gasolinerasConDistancia = data.ListaEESSPrecio
-          .filter(g => g.Latitud && g.Longitud) // Filtrar gasolineras sin coordenadas
-          .map((g: Gasolinera) => {
+          .filter((g): g is GasolineraAPI => 
+            g.Latitud != null && 
+            g.Longitud != null && 
+            g.Latitud !== '' && 
+            g.Longitud !== ''
+          )
+          .map((g: GasolineraAPI): GasolineraProcessed | null => {
             try {
               const latitud = parseFloat(g.Latitud.replace(',', '.'));
               const longitud = parseFloat(g.Longitud.replace(',', '.'));
@@ -87,15 +97,15 @@ const App = () => {
                   location.lon,
                   latitud,
                   longitud
-                ),
+                )
               };
             } catch (err) {
               console.error('Error procesando gasolinera:', err);
               return null;
             }
           })
-          .filter((g): g is Gasolinera => g !== null)
-          .sort((a: Gasolinera, b: Gasolinera) => (a.distancia ?? 0) - (b.distancia ?? 0))
+          .filter((g): g is GasolineraProcessed => g !== null)
+          .sort((a, b) => a.distancia - b.distancia)
           .slice(0, 6);
 
         if (gasolinerasConDistancia.length === 0) {
@@ -154,7 +164,7 @@ const App = () => {
               <h3 className="text-xl font-semibold mb-2">⛽ {g["Rótulo"]}</h3>
               <p className="mb-1">📍 <strong>Dirección:</strong> {g["Dirección"]}</p>
               <p className="mb-1">🏙️ <strong>Población:</strong> {g["Municipio"]}</p>
-              <p className="mb-1">📏 <strong>Distancia:</strong> {g.distancia?.toFixed(2)} km</p>
+              <p className="mb-1">📏 <strong>Distancia:</strong> {g.distancia.toFixed(2)} km</p>
               <p className="mb-1">
                 💰 <strong>Precio Gasolina 95:</strong>{' '}
                 {g["Precio Gasolina 95 E5"] || "No disponible"} €/L
