@@ -68,56 +68,41 @@ const App = () => {
       setError(null);
       
       try {
-        // Buscar el dataset de precios de carburantes
-        const datasetResponse = await fetch('https://datos.gob.es/apidata/catalog/dataset/title/precio-carburantes', {
+        // URL directa al dataset de precios de carburantes
+        const API_URL = 'https://sedeaplicaciones.minetur.gob.es/ServiciosRESTCarburantes/PreciosCarburantes/EstacionesTerrestres/';
+        
+        console.log('Obteniendo datos de gasolineras...');
+        const response = await fetch(API_URL, {
           headers: {
             'Accept': 'application/json'
           }
         });
 
-        if (!datasetResponse.ok) {
-          throw new Error('Error obteniendo información del dataset');
+        if (!response.ok) {
+          throw new Error(`Error en la petición: ${response.status}`);
         }
 
-        const datasetData = await datasetResponse.json();
-        console.log('Dataset encontrado:', datasetData);
-
-        if (!datasetData?.result?.items?.[0]) {
-          throw new Error('No se encontró el dataset de precios de carburantes');
-        }
-
-        const datasetId = datasetData.result.items[0].identifier;
-        const distributionResponse = await fetch(`https://datos.gob.es/apidata/catalog/distribution/dataset/${datasetId}`, {
-          headers: {
-            'Accept': 'application/json'
-          }
-        });
-
-        if (!distributionResponse.ok) {
-          throw new Error('Error obteniendo distribuciones');
-        }
-
-        const distributionData = await distributionResponse.json();
-        console.log('Distribuciones encontradas:', distributionData);
+        const data = await response.json();
+        console.log('Datos recibidos:', data);
 
         // Procesar y transformar los datos
-        const gasolinerasConDistancia = Object.entries(distributionData)
-          .filter(([_, g]) => {
-            const gas = g as GasolineraAPI;
-            return gas?.Latitud && gas?.Longitud;
-          })
-          .map(([_, g]) => {
-            const gas = g as GasolineraAPI;
+        if (!data?.ListaEESSPrecio) {
+          throw new Error('Formato de datos inválido');
+        }
+
+        const gasolinerasConDistancia = data.ListaEESSPrecio
+          .filter((g: GasolineraAPI) => g?.Latitud && g?.Longitud)
+          .map((g: GasolineraAPI) => {
             try {
-              const latitud = parseFloat(gas.Latitud.replace(',', '.'));
-              const longitud = parseFloat(gas.Longitud.replace(',', '.'));
+              const latitud = parseFloat(g.Latitud.replace(',', '.'));
+              const longitud = parseFloat(g.Longitud.replace(',', '.'));
               
               if (isNaN(latitud) || isNaN(longitud)) {
                 return null;
               }
 
               const gasProcessed: GasolineraProcessed = {
-                ...gas,
+                ...g,
                 latitud,
                 longitud,
                 distancia: calcularDistancia(
