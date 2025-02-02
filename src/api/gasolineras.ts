@@ -1,14 +1,11 @@
-import axios from "axios";
-
-const API_URL = "https://sedeaplicaciones.minetur.gob.es/ServiciosRESTCarburantes/PreciosCarburantes/";
+import axios from 'axios';
 
 export const obtenerGasolineras = async () => {
   try {
-    const response = await axios.get(`${API_URL}EstacionesTerrestres/`);
-    console.log("Respuesta de la API:", response.data);
-    return response.data.ListaEESSPrecio; // Verifica que esta clave existe
+    const response = await axios.get('https://sedeaplicaciones.minetur.gob.es/ServiciosRESTCarburantes/PreciosCarburantes/EstacionesTerrestresHist/12-08-2024');
+    return response.data.ListaEESSPrecio;
   } catch (error) {
-    console.error("Error al obtener los datos de la API:", error);
+    console.error('Error al obtener las gasolineras:', error);
     return [];
   }
 };
