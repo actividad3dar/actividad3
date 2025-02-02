@@ -33,30 +33,40 @@ const App = () => {
   const [gasolineras, setGasolineras] = useState<Gasolinera[]>([]);
 
   useEffect(() => {
-    if (location) {
-      obtenerGasolineras().then((data) => {
-        console.log("Gasolineras obtenidas:", data);
+  if (location) {
+    console.log("Ubicación obtenida:", location);
+    obtenerGasolineras().then((data) => {
+      console.log("Gasolineras obtenidas de la API:", data);
 
-        // Convertir coordenadas de string a número y calcular distancia
-        const gasolinerasConDistancia: Gasolinera[] = data.map((g: Gasolinera) => ({
-          ...g,
-          latitud: parseFloat(g["Latitud"].replace(",", ".")), 
-          longitud: parseFloat(g["Longitud"].replace(",", ".")),
-          distancia: calcularDistancia(
-            location.lat,
-            location.lon,
-            parseFloat(g["Latitud"].replace(",", ".")),
-            parseFloat(g["Longitud"].replace(",", "."))
-          ),
-        }));
+      if (!data || data.length === 0) {
+        console.error("No se recibieron datos de la API");
+        return;
+      }
 
-        // Ordenar por distancia y tomar solo las 6 más cercanas
-        gasolinerasConDistancia.sort((a, b) => (a.distancia ?? 0) - (b.distancia ?? 0));
+      // Convertir coordenadas y calcular distancia
+      const gasolinerasConDistancia: Gasolinera[] = data.map((g: Gasolinera) => ({
+        ...g,
+        latitud: parseFloat(g["Latitud"].replace(",", ".")), 
+        longitud: parseFloat(g["Longitud"].replace(",", ".")),
+        distancia: calcularDistancia(
+          location.lat,
+          location.lon,
+          parseFloat(g["Latitud"].replace(",", ".")),
+          parseFloat(g["Longitud"].replace(",", "."))
+        ),
+      }));
 
-        setGasolineras(gasolinerasConDistancia.slice(0, 6));
-      });
-    }
-  }, [location]);
+      // Ordenar por distancia
+      gasolinerasConDistancia.sort((a, b) => (a.distancia ?? 0) - (b.distancia ?? 0));
+
+      console.log("Gasolineras ordenadas por distancia:", gasolinerasConDistancia.slice(0, 6));
+      
+      setGasolineras(gasolinerasConDistancia.slice(0, 6));
+    }).catch((error) => {
+      console.error("Error obteniendo gasolineras:", error);
+    });
+  }
+}, [location]);
 
   return (
     <div style={{ textAlign: "center", marginTop: "50px" }}>
